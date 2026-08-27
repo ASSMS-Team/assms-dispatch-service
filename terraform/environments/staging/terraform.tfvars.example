@@ -1,4 +1,6 @@
 environment = "staging"
+# Staging resolves its region from platform/staging.tfstate secondary_region.
+# This fallback is used only when platform remote state is intentionally disabled.
 location    = "southeastasia"
 
 platform_state_resource_group_name  = "rg-assms-tfstate"

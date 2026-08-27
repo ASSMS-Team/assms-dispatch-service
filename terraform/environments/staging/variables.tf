@@ -4,7 +4,7 @@ variable "environment" {
   default     = "staging"
 }
 variable "location" {
-  description = "Azure region for the service VM."
+  description = "Fallback Azure region when platform remote state is intentionally disabled; normal staging uses platform secondary_region."
   type        = string
   default     = "southeastasia"
 }
