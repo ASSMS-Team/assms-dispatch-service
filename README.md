@@ -2,6 +2,10 @@
 
 ## Overview
 
+Dispatch owns technician coverage and later assignment decisions. Sprint 2
+starts with the Technician creation contract in
+[`docs/technician-management/US-05A-create-technician.md`](docs/technician-management/US-05A-create-technician.md).
+
 ## Responsibilities
 
 ## Technology
@@ -17,6 +21,11 @@
 ## Deployment
 
 ## Documentation
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `POST` | `/api/technicians` | Create a Dispatch-owned technician record. |
+| `GET` | `/api/technicians/{id}` | Retrieve a technician by Dispatch id. |
 
 ## Database Ownership
 
