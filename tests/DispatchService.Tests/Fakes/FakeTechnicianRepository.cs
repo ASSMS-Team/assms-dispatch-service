@@ -10,6 +10,7 @@ public class FakeTechnicianRepository : ITechnicianRepository
     public Technician? CreatedTechnician;
     public Technician? TechnicianToReturn;
     public IReadOnlyList<Technician> TechniciansToReturn { get; set; } = Array.Empty<Technician>();
+    public string? RequestedId;
     public int CreateCallCount;
 
     public Task<bool> ReferenceExistsAsync(string reference)
@@ -25,7 +26,11 @@ public class FakeTechnicianRepository : ITechnicianRepository
         return Task.CompletedTask;
     }
 
-    public Task<Technician?> GetByIdAsync(string id) => Task.FromResult(TechnicianToReturn);
+    public Task<Technician?> GetByIdAsync(string id)
+    {
+        RequestedId = id;
+        return Task.FromResult(TechnicianToReturn);
+    }
 
     public Task<IReadOnlyList<Technician>> GetAllAsync() => Task.FromResult(TechniciansToReturn);
 }
