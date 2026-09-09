@@ -111,4 +111,55 @@ ORDER BY ts.skill;";
         if (technician is not null) technician.Skills = skills;
         return technician;
     }
+
+    public async Task<IReadOnlyList<Technician>> GetAllAsync()
+    {
+        await using var connection = _connectionFactory.CreateConnection();
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = @"
+SELECT t.id, t.technician_reference, t.full_name, t.region, t.status, t.phone, t.email, t.created_at, t.updated_at, ts.skill
+FROM technicians t
+LEFT JOIN technician_skills ts ON ts.technician_id = t.id
+ORDER BY t.full_name, t.technician_reference, ts.skill;";
+
+        await using var reader = await command.ExecuteReaderAsync();
+        var technicians = new Dictionary<string, Technician>(StringComparer.Ordinal);
+        var idOrdinal = reader.GetOrdinal("id");
+        var referenceOrdinal = reader.GetOrdinal("technician_reference");
+        var fullNameOrdinal = reader.GetOrdinal("full_name");
+        var regionOrdinal = reader.GetOrdinal("region");
+        var statusOrdinal = reader.GetOrdinal("status");
+        var phoneOrdinal = reader.GetOrdinal("phone");
+        var emailOrdinal = reader.GetOrdinal("email");
+        var createdAtOrdinal = reader.GetOrdinal("created_at");
+        var updatedAtOrdinal = reader.GetOrdinal("updated_at");
+        var skillOrdinal = reader.GetOrdinal("skill");
+
+        while (await reader.ReadAsync())
+        {
+            var id = reader.GetString(idOrdinal);
+            if (!technicians.TryGetValue(id, out var technician))
+            {
+                technician = new Technician
+                {
+                    Id = id,
+                    Reference = reader.GetString(referenceOrdinal),
+                    FullName = reader.GetString(fullNameOrdinal),
+                    Region = reader.GetString(regionOrdinal),
+                    Status = reader.GetString(statusOrdinal),
+                    Phone = reader.IsDBNull(phoneOrdinal) ? null : reader.GetString(phoneOrdinal),
+                    Email = reader.IsDBNull(emailOrdinal) ? null : reader.GetString(emailOrdinal),
+                    CreatedAt = reader.GetDateTime(createdAtOrdinal),
+                    UpdatedAt = reader.GetDateTime(updatedAtOrdinal),
+                };
+                technicians.Add(id, technician);
+            }
+
+            if (!reader.IsDBNull(skillOrdinal))
+                technician.Skills = technician.Skills.Append(reader.GetString(skillOrdinal)).ToList();
+        }
+
+        return technicians.Values.ToList();
+    }
 }

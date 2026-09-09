@@ -67,6 +67,12 @@ public class TechnicianService
         return technician is null ? null : ToResponse(technician);
     }
 
+    public async Task<IReadOnlyList<TechnicianResponse>> GetAllAsync()
+    {
+        var technicians = await _repository.GetAllAsync();
+        return technicians.Select(ToResponse).ToList();
+    }
+
     private static string? EmptyToNull(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private static TechnicianResponse ToResponse(Technician technician) => new()

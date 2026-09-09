@@ -25,6 +25,7 @@ starts with the Technician creation contract in
 | Method | Path | Purpose |
 | --- | --- | --- |
 | `POST` | `/api/technicians` | Create a Dispatch-owned technician record. |
+| `GET` | `/api/technicians` | List technician capability records for Dispatch. |
 | `GET` | `/api/technicians/{id}` | Retrieve a technician by Dispatch id. |
 
 ## Database Ownership

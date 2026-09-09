@@ -83,4 +83,39 @@ public class TechnicianServiceTests
 
         Assert.Equal(["Electrical", "AC"], repository.CreatedTechnician!.Skills);
     }
+
+    [Fact]
+    public async Task GetAllAsync_ReturnsTechnicianCapabilityData()
+    {
+        var repository = new FakeTechnicianRepository
+        {
+            TechniciansToReturn =
+            [
+                new DispatchService.Models.Technician
+                {
+                    Id = "technician-1", Reference = "TEC-001", FullName = "Amal Perera",
+                    Region = "WESTERN", Status = "ACTIVE", Skills = ["Electrical", "AC"],
+                },
+            ],
+        };
+        var service = new TechnicianService(repository);
+
+        var technicians = await service.GetAllAsync();
+
+        var technician = Assert.Single(technicians);
+        Assert.Equal("TEC-001", technician.Reference);
+        Assert.Equal("WESTERN", technician.Region);
+        Assert.Equal("ACTIVE", technician.Status);
+        Assert.Equal(["Electrical", "AC"], technician.Skills);
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_WhenUnknown_ReturnsNull()
+    {
+        var service = new TechnicianService(new FakeTechnicianRepository());
+
+        var technician = await service.GetByIdAsync("unknown-id");
+
+        Assert.Null(technician);
+    }
 }
