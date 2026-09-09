@@ -112,6 +112,62 @@ ORDER BY ts.skill;";
         return technician;
     }
 
+    public async Task<bool> UpdateAsync(Technician technician)
+    {
+        await using var connection = _connectionFactory.CreateConnection();
+        await connection.OpenAsync();
+        await using var transaction = await connection.BeginTransactionAsync();
+
+        try
+        {
+            await using (var update = connection.CreateCommand())
+            {
+                update.Transaction = transaction;
+                update.CommandText = @"
+UPDATE technicians
+SET full_name = @fullName, region = @region, status = @status, phone = @phone, email = @email
+WHERE id = @id;";
+                update.Parameters.AddWithValue("@id", technician.Id);
+                update.Parameters.AddWithValue("@fullName", technician.FullName);
+                update.Parameters.AddWithValue("@region", technician.Region);
+                update.Parameters.AddWithValue("@status", technician.Status);
+                update.Parameters.AddWithValue("@phone", (object?)technician.Phone ?? DBNull.Value);
+                update.Parameters.AddWithValue("@email", (object?)technician.Email ?? DBNull.Value);
+                if (await update.ExecuteNonQueryAsync() == 0)
+                {
+                    await transaction.RollbackAsync();
+                    return false;
+                }
+            }
+
+            await using (var deleteSkills = connection.CreateCommand())
+            {
+                deleteSkills.Transaction = transaction;
+                deleteSkills.CommandText = "DELETE FROM technician_skills WHERE technician_id = @id;";
+                deleteSkills.Parameters.AddWithValue("@id", technician.Id);
+                await deleteSkills.ExecuteNonQueryAsync();
+            }
+
+            foreach (var skill in technician.Skills)
+            {
+                await using var insertSkill = connection.CreateCommand();
+                insertSkill.Transaction = transaction;
+                insertSkill.CommandText = "INSERT INTO technician_skills (technician_id, skill) VALUES (@id, @skill);";
+                insertSkill.Parameters.AddWithValue("@id", technician.Id);
+                insertSkill.Parameters.AddWithValue("@skill", skill);
+                await insertSkill.ExecuteNonQueryAsync();
+            }
+
+            await transaction.CommitAsync();
+            return true;
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
+    }
+
     public async Task<IReadOnlyList<Technician>> GetAllAsync()
     {
         await using var connection = _connectionFactory.CreateConnection();

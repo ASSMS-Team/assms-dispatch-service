@@ -6,8 +6,10 @@ using MySqlConnector;
 namespace DispatchService.Services;
 
 public enum TechnicianCreateError { None, DuplicateReference, InvalidSkills }
+public enum TechnicianUpdateError { None, NotFound, InvalidSkills, InvalidRegion }
 
 public record TechnicianCreateResult(TechnicianResponse? Value, TechnicianCreateError Error);
+public record TechnicianUpdateResult(TechnicianResponse? Value, TechnicianUpdateError Error);
 
 public class TechnicianService
 {
@@ -71,6 +73,45 @@ public class TechnicianService
     {
         var technicians = await _repository.GetAllAsync();
         return technicians.Select(ToResponse).ToList();
+    }
+
+    public async Task<TechnicianUpdateResult> UpdateAsync(string id, UpdateTechnicianRequest request)
+    {
+        var existing = await _repository.GetByIdAsync(id);
+        if (existing is null) return new(null, TechnicianUpdateError.NotFound);
+
+        var skills = NormalizeSkills(request.Skills);
+        if (skills is null) return new(null, TechnicianUpdateError.InvalidSkills);
+
+        var region = request.Region.Trim().ToUpperInvariant();
+        if (!SupportedRegions.Contains(region)) return new(null, TechnicianUpdateError.InvalidRegion);
+
+        existing.FullName = request.FullName.Trim();
+        existing.Region = region;
+        existing.Skills = skills;
+        existing.Status = request.Status.Trim().ToUpperInvariant();
+        existing.Phone = EmptyToNull(request.Phone);
+        existing.Email = EmptyToNull(request.Email);
+
+        if (!await _repository.UpdateAsync(existing)) return new(null, TechnicianUpdateError.NotFound);
+
+        existing.UpdatedAt = DateTime.UtcNow;
+        return new(ToResponse(existing), TechnicianUpdateError.None);
+    }
+
+    private static readonly HashSet<string> SupportedRegions = new(StringComparer.Ordinal)
+    {
+        "WESTERN", "CENTRAL", "SOUTHERN", "NORTHERN", "EASTERN", "NORTH_WESTERN", "NORTH_CENTRAL", "UVA", "SABARAGAMUWA",
+    };
+
+    private static string[]? NormalizeSkills(IEnumerable<string>? values)
+    {
+        var skills = (values ?? [])
+            .Select(skill => skill?.Trim() ?? string.Empty)
+            .Where(skill => skill.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        return skills.Length == 0 || skills.Any(skill => skill.Length > 50) ? null : skills;
     }
 
     private static string? EmptyToNull(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();

@@ -47,6 +47,22 @@ public class TechniciansController : ControllerBase
         return Ok(await _technicianService.GetAllAsync());
     }
 
+    /// <summary>Updates Dispatch-owned technician capability data and replaces its skill set atomically.</summary>
+    [HttpPut("{id}")]
+    [ProducesResponseType(typeof(TechnicianResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Update(string id, [FromBody] UpdateTechnicianRequest request)
+    {
+        var result = await _technicianService.UpdateAsync(id, request);
+        if (result.Error == TechnicianUpdateError.NotFound) return NotFound();
+        if (result.Error == TechnicianUpdateError.InvalidSkills)
+            return BadRequest(ValidationError("skills", "Provide at least one non-empty skill of at most 50 characters."));
+        if (result.Error == TechnicianUpdateError.InvalidRegion)
+            return BadRequest(ValidationError("region", "Region must be one of the nine supported provinces."));
+        return Ok(result.Value);
+    }
+
     /// <summary>Returns a Technician by its Dispatch id.</summary>
     [HttpGet("{id}")]
     [ProducesResponseType(typeof(TechnicianResponse), StatusCodes.Status200OK)]
@@ -56,4 +72,9 @@ public class TechniciansController : ControllerBase
         var technician = await _technicianService.GetByIdAsync(id);
         return technician is null ? NotFound() : Ok(technician);
     }
+
+    private static ValidationProblemDetails ValidationError(string field, string message) => new(new Dictionary<string, string[]>
+    {
+        [field] = new[] { message },
+    }) { Status = StatusCodes.Status400BadRequest };
 }
