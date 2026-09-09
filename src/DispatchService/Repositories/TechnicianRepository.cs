@@ -95,7 +95,7 @@ ORDER BY ts.skill;";
         {
             technician ??= new Technician
             {
-                Id = reader.GetString(idOrdinal),
+                Id = reader.GetValue(idOrdinal).ToString()!,
                 Reference = reader.GetString(referenceOrdinal),
                 FullName = reader.GetString(fullNameOrdinal),
                 Region = reader.GetString(regionOrdinal),
@@ -253,7 +253,7 @@ ORDER BY t.full_name, t.technician_reference, ts.skill;";
 
         while (await reader.ReadAsync())
         {
-            var id = reader.GetString(idOrdinal);
+            var id = reader.GetValue(idOrdinal).ToString()!;
             if (!technicians.TryGetValue(id, out var technician))
             {
                 technician = new Technician
