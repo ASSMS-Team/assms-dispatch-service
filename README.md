@@ -27,6 +27,7 @@ starts with the Technician creation contract in
 | `POST` | `/api/technicians` | Create a Dispatch-owned technician record. |
 | `GET` | `/api/technicians` | List technician capability records for Dispatch. |
 | `GET` | `/api/technicians/{id}` | Retrieve a technician by Dispatch id. |
+| `PUT` | `/api/technicians/{id}` | Update technician capability data and skills atomically. |
 
 ## Database Ownership
 

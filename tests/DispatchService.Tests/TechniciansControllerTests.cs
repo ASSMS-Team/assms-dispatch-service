@@ -76,4 +76,28 @@ public class TechniciansControllerTests
         Assert.Equal(StatusCodes.Status400BadRequest, problem.Status);
         Assert.Contains("skills", problem.Errors.Keys);
     }
+
+    [Fact]
+    public async Task Update_WhenRegionIsInvalid_ReturnsFieldValidationError()
+    {
+        var existing = new Technician { Id = "technician-1", Region = "WESTERN", Skills = ["Electrical"] };
+        var controller = new TechniciansController(new TechnicianService(new FakeTechnicianRepository { TechnicianToReturn = existing }));
+        var request = new UpdateTechnicianRequest { FullName = "Amal Perera", Region = "INVALID", Skills = ["Electrical"], Status = "ACTIVE" };
+
+        var action = await controller.Update(existing.Id, request);
+
+        var result = Assert.IsType<BadRequestObjectResult>(action);
+        var problem = Assert.IsType<ValidationProblemDetails>(result.Value);
+        Assert.Contains("region", problem.Errors.Keys);
+    }
+
+    [Fact]
+    public async Task Update_WhenTechnicianIsUnknown_ReturnsNotFound()
+    {
+        var controller = new TechniciansController(new TechnicianService(new FakeTechnicianRepository()));
+
+        var action = await controller.Update("unknown-id", new UpdateTechnicianRequest { FullName = "Amal Perera", Region = "WESTERN", Skills = ["Electrical"], Status = "ACTIVE" });
+
+        Assert.IsType<NotFoundResult>(action);
+    }
 }

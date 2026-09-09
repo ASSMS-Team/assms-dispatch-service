@@ -118,4 +118,78 @@ public class TechnicianServiceTests
 
         Assert.Null(technician);
     }
+
+    [Fact]
+    public async Task UpdateAsync_WithValidDetails_ReplacesRegionAndSkills()
+    {
+        var existing = ExistingTechnician();
+        var repository = new FakeTechnicianRepository { TechnicianToReturn = existing };
+        var service = new TechnicianService(repository);
+
+        var result = await service.UpdateAsync(existing.Id, ValidUpdateRequest());
+
+        Assert.Equal(TechnicianUpdateError.None, result.Error);
+        Assert.Equal(1, repository.UpdateCallCount);
+        Assert.Equal("CENTRAL", repository.UpdatedTechnician!.Region);
+        Assert.Equal(["Plumbing", "Pumps"], repository.UpdatedTechnician.Skills);
+        Assert.Equal("CENTRAL", result.Value!.Region);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WithInvalidRegion_DoesNotChangeStoredTechnician()
+    {
+        var existing = ExistingTechnician();
+        var repository = new FakeTechnicianRepository { TechnicianToReturn = existing };
+        var service = new TechnicianService(repository);
+        var request = ValidUpdateRequest();
+        request.Region = "INVALID";
+
+        var result = await service.UpdateAsync(existing.Id, request);
+
+        Assert.Equal(TechnicianUpdateError.InvalidRegion, result.Error);
+        Assert.Equal(0, repository.UpdateCallCount);
+        Assert.Equal("WESTERN", existing.Region);
+        Assert.Equal(["Electrical"], existing.Skills);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WithoutSkills_DoesNotChangeStoredTechnician()
+    {
+        var existing = ExistingTechnician();
+        var repository = new FakeTechnicianRepository { TechnicianToReturn = existing };
+        var service = new TechnicianService(repository);
+        var request = ValidUpdateRequest();
+        request.Skills = [];
+
+        var result = await service.UpdateAsync(existing.Id, request);
+
+        Assert.Equal(TechnicianUpdateError.InvalidSkills, result.Error);
+        Assert.Equal(0, repository.UpdateCallCount);
+        Assert.Equal("WESTERN", existing.Region);
+        Assert.Equal(["Electrical"], existing.Skills);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WhenTechnicianIsUnknown_ReturnsNotFound()
+    {
+        var repository = new FakeTechnicianRepository();
+        var service = new TechnicianService(repository);
+
+        var result = await service.UpdateAsync("unknown-id", ValidUpdateRequest());
+
+        Assert.Equal(TechnicianUpdateError.NotFound, result.Error);
+        Assert.Equal(0, repository.UpdateCallCount);
+    }
+
+    private static DispatchService.Models.Technician ExistingTechnician() => new()
+    {
+        Id = "technician-1", Reference = "TEC-001", FullName = "Amal Perera", Region = "WESTERN",
+        Status = "ACTIVE", Skills = ["Electrical"],
+    };
+
+    private static UpdateTechnicianRequest ValidUpdateRequest() => new()
+    {
+        FullName = "Amal Perera", Region = "CENTRAL", Skills = ["Plumbing", "Pumps"],
+        Status = "ACTIVE", Phone = null, Email = null,
+    };
 }
