@@ -15,6 +15,8 @@ public class FakeTechnicianRepository : ITechnicianRepository
     public int UpdateCallCount;
     public Technician? UpdatedTechnician;
     public bool UpdateSucceeds = true;
+    public TechnicianDeactivationPersistenceResult DeactivationResult = TechnicianDeactivationPersistenceResult.Deactivated;
+    public int DeactivateCallCount;
 
     public Task<bool> ReferenceExistsAsync(string reference)
     {
@@ -34,6 +36,15 @@ public class FakeTechnicianRepository : ITechnicianRepository
         UpdateCallCount++;
         UpdatedTechnician = technician;
         return Task.FromResult(UpdateSucceeds);
+    }
+
+    public Task<TechnicianDeactivationPersistenceResult> DeactivateAsync(string id)
+    {
+        RequestedId = id;
+        DeactivateCallCount++;
+        if (DeactivationResult == TechnicianDeactivationPersistenceResult.Deactivated && TechnicianToReturn is not null)
+            TechnicianToReturn.Status = "INACTIVE";
+        return Task.FromResult(DeactivationResult);
     }
 
     public Task<Technician?> GetByIdAsync(string id)

@@ -7,9 +7,11 @@ namespace DispatchService.Services;
 
 public enum TechnicianCreateError { None, DuplicateReference, InvalidSkills }
 public enum TechnicianUpdateError { None, NotFound, InvalidSkills, InvalidRegion }
+public enum TechnicianDeactivationError { None, NotFound, HasOpenAssignments }
 
 public record TechnicianCreateResult(TechnicianResponse? Value, TechnicianCreateError Error);
 public record TechnicianUpdateResult(TechnicianResponse? Value, TechnicianUpdateError Error);
+public record TechnicianDeactivationResult(TechnicianResponse? Value, TechnicianDeactivationError Error);
 
 public class TechnicianService
 {
@@ -97,6 +99,27 @@ public class TechnicianService
 
         existing.UpdatedAt = DateTime.UtcNow;
         return new(ToResponse(existing), TechnicianUpdateError.None);
+    }
+
+    public async Task<TechnicianDeactivationResult> DeactivateAsync(string id)
+    {
+        var outcome = await _repository.DeactivateAsync(id);
+
+        if (outcome == TechnicianDeactivationPersistenceResult.NotFound)
+            return new(null, TechnicianDeactivationError.NotFound);
+
+        if (outcome == TechnicianDeactivationPersistenceResult.HasOpenAssignments)
+            return new(null, TechnicianDeactivationError.HasOpenAssignments);
+
+        var technician = await _repository.GetByIdAsync(id);
+        if (technician is null)
+            return new(null, TechnicianDeactivationError.NotFound);
+
+        // The repository locks the record while deciding whether it can be
+        // deactivated. A repeated request therefore returns its stored inactive
+        // state without writing or deleting anything.
+        technician.Status = "INACTIVE";
+        return new(ToResponse(technician), TechnicianDeactivationError.None);
     }
 
     private static readonly HashSet<string> SupportedRegions = new(StringComparer.Ordinal)

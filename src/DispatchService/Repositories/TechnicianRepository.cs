@@ -168,6 +168,65 @@ WHERE id = @id;";
         }
     }
 
+    public async Task<TechnicianDeactivationPersistenceResult> DeactivateAsync(string id)
+    {
+        await using var connection = _connectionFactory.CreateConnection();
+        await connection.OpenAsync();
+        await using var transaction = await connection.BeginTransactionAsync();
+
+        try
+        {
+            await using var statusCommand = connection.CreateCommand();
+            statusCommand.Transaction = transaction;
+            statusCommand.CommandText = "SELECT status FROM technicians WHERE id = @id FOR UPDATE;";
+            statusCommand.Parameters.AddWithValue("@id", id);
+            var status = await statusCommand.ExecuteScalarAsync() as string;
+
+            if (status is null)
+            {
+                await transaction.RollbackAsync();
+                return TechnicianDeactivationPersistenceResult.NotFound;
+            }
+
+            if (string.Equals(status, "INACTIVE", StringComparison.Ordinal))
+            {
+                await transaction.CommitAsync();
+                return TechnicianDeactivationPersistenceResult.AlreadyInactive;
+            }
+
+            await using var openAssignmentCommand = connection.CreateCommand();
+            openAssignmentCommand.Transaction = transaction;
+            openAssignmentCommand.CommandText = @"
+SELECT EXISTS(
+    SELECT 1
+    FROM technician_assignments
+    WHERE technician_id = @id
+      AND released_at IS NULL
+      AND job_status NOT IN ('COMPLETED', 'CANCELLED'))";
+            openAssignmentCommand.Parameters.AddWithValue("@id", id);
+            var hasOpenAssignments = Convert.ToInt64(await openAssignmentCommand.ExecuteScalarAsync()) == 1;
+
+            if (hasOpenAssignments)
+            {
+                await transaction.RollbackAsync();
+                return TechnicianDeactivationPersistenceResult.HasOpenAssignments;
+            }
+
+            await using var deactivateCommand = connection.CreateCommand();
+            deactivateCommand.Transaction = transaction;
+            deactivateCommand.CommandText = "UPDATE technicians SET status = 'INACTIVE' WHERE id = @id;";
+            deactivateCommand.Parameters.AddWithValue("@id", id);
+            await deactivateCommand.ExecuteNonQueryAsync();
+            await transaction.CommitAsync();
+            return TechnicianDeactivationPersistenceResult.Deactivated;
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
+    }
+
     public async Task<IReadOnlyList<Technician>> GetAllAsync()
     {
         await using var connection = _connectionFactory.CreateConnection();

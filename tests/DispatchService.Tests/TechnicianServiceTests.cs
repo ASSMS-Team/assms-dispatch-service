@@ -1,4 +1,5 @@
 using DispatchService.DTOs;
+using DispatchService.Repositories;
 using DispatchService.Services;
 using DispatchService.Tests.Fakes;
 
@@ -179,6 +180,63 @@ public class TechnicianServiceTests
 
         Assert.Equal(TechnicianUpdateError.NotFound, result.Error);
         Assert.Equal(0, repository.UpdateCallCount);
+    }
+
+    [Fact]
+    public async Task DeactivateAsync_WithNoOpenAssignments_SoftDeactivatesTechnician()
+    {
+        var existing = ExistingTechnician();
+        var repository = new FakeTechnicianRepository { TechnicianToReturn = existing };
+        var result = await new TechnicianService(repository).DeactivateAsync(existing.Id);
+
+        Assert.Equal(TechnicianDeactivationError.None, result.Error);
+        Assert.Equal(1, repository.DeactivateCallCount);
+        Assert.Equal("INACTIVE", existing.Status);
+        Assert.Equal("INACTIVE", result.Value!.Status);
+    }
+
+    [Fact]
+    public async Task DeactivateAsync_WithOpenAssignments_LeavesTechnicianActive()
+    {
+        var existing = ExistingTechnician();
+        var repository = new FakeTechnicianRepository
+        {
+            TechnicianToReturn = existing,
+            DeactivationResult = TechnicianDeactivationPersistenceResult.HasOpenAssignments,
+        };
+        var result = await new TechnicianService(repository).DeactivateAsync(existing.Id);
+
+        Assert.Equal(TechnicianDeactivationError.HasOpenAssignments, result.Error);
+        Assert.Equal("ACTIVE", existing.Status);
+    }
+
+    [Fact]
+    public async Task DeactivateAsync_WhenAlreadyInactive_ReturnsTheStoredInactiveState()
+    {
+        var existing = ExistingTechnician();
+        existing.Status = "INACTIVE";
+        var repository = new FakeTechnicianRepository
+        {
+            TechnicianToReturn = existing,
+            DeactivationResult = TechnicianDeactivationPersistenceResult.AlreadyInactive,
+        };
+        var result = await new TechnicianService(repository).DeactivateAsync(existing.Id);
+
+        Assert.Equal(TechnicianDeactivationError.None, result.Error);
+        Assert.Equal("INACTIVE", result.Value!.Status);
+        Assert.Equal(1, repository.DeactivateCallCount);
+    }
+
+    [Fact]
+    public async Task DeactivateAsync_WhenTechnicianIsUnknown_ReturnsNotFound()
+    {
+        var repository = new FakeTechnicianRepository
+        {
+            DeactivationResult = TechnicianDeactivationPersistenceResult.NotFound,
+        };
+        var result = await new TechnicianService(repository).DeactivateAsync("unknown-id");
+
+        Assert.Equal(TechnicianDeactivationError.NotFound, result.Error);
     }
 
     private static DispatchService.Models.Technician ExistingTechnician() => new()

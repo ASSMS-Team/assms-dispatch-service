@@ -1,5 +1,7 @@
 using DispatchService.DTOs;
+using DispatchService.Security;
 using DispatchService.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DispatchService.Controllers;
@@ -7,6 +9,7 @@ namespace DispatchService.Controllers;
 [ApiController]
 [Route("api/technicians")]
 [Produces("application/json")]
+[Authorize(Roles = StaffRoles.TechnicianManagement)]
 public class TechniciansController : ControllerBase
 {
     private readonly TechnicianService _technicianService;
@@ -60,6 +63,26 @@ public class TechniciansController : ControllerBase
             return BadRequest(ValidationError("skills", "Provide at least one non-empty skill of at most 50 characters."));
         if (result.Error == TechnicianUpdateError.InvalidRegion)
             return BadRequest(ValidationError("region", "Region must be one of the nine supported provinces."));
+        return Ok(result.Value);
+    }
+
+    /// <summary>Soft-deactivates a Technician after confirming that no open assignment remains. The Technician and assignment history are retained. Repeating the request returns the current inactive Technician.</summary>
+    [HttpPost("{id}/deactivate")]
+    [ProducesResponseType(typeof(TechnicianResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Deactivate(string id)
+    {
+        var result = await _technicianService.DeactivateAsync(id);
+        if (result.Error == TechnicianDeactivationError.NotFound) return NotFound();
+        if (result.Error == TechnicianDeactivationError.HasOpenAssignments)
+            return Conflict(new ProblemDetails
+            {
+                Title = "Technician has open assignments.",
+                Detail = "Reassign or close the technician's open jobs before deactivation.",
+                Status = StatusCodes.Status409Conflict,
+            });
+
         return Ok(result.Value);
     }
 
