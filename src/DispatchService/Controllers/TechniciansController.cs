@@ -39,6 +39,14 @@ public class TechniciansController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = result.Value!.Id }, result.Value);
     }
 
+    /// <summary>Returns all Dispatch-owned Technicians with their assignment capability fields.</summary>
+    [HttpGet]
+    [ProducesResponseType(typeof(IReadOnlyList<TechnicianResponse>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<TechnicianResponse>>> GetAll()
+    {
+        return Ok(await _technicianService.GetAllAsync());
+    }
+
     /// <summary>Returns a Technician by its Dispatch id.</summary>
     [HttpGet("{id}")]
     [ProducesResponseType(typeof(TechnicianResponse), StatusCodes.Status200OK)]

@@ -9,6 +9,7 @@ public class FakeTechnicianRepository : ITechnicianRepository
     public string? CheckedReference;
     public Technician? CreatedTechnician;
     public Technician? TechnicianToReturn;
+    public IReadOnlyList<Technician> TechniciansToReturn { get; set; } = Array.Empty<Technician>();
     public int CreateCallCount;
 
     public Task<bool> ReferenceExistsAsync(string reference)
@@ -25,4 +26,6 @@ public class FakeTechnicianRepository : ITechnicianRepository
     }
 
     public Task<Technician?> GetByIdAsync(string id) => Task.FromResult(TechnicianToReturn);
+
+    public Task<IReadOnlyList<Technician>> GetAllAsync() => Task.FromResult(TechniciansToReturn);
 }
