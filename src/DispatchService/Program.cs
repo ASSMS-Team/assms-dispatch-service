@@ -7,6 +7,7 @@ using DispatchService.Repositories;
 using DispatchService.Security;
 using DispatchService.Services;
 using DispatchService.Messaging.Consumers;
+using DispatchService.Messaging.Publishers;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -63,6 +64,8 @@ builder.Services.AddScoped<ITechnicianRepository, TechnicianRepository>();
 builder.Services.AddScoped<TechnicianService>();
 builder.Services.AddScoped<ICandidateEvaluationRepository, CandidateEvaluationRepository>();
 builder.Services.AddScoped<ICandidateEvaluationService, CandidateEvaluationService>();
+builder.Services.AddScoped<IAutomaticAssignmentRepository, AutomaticAssignmentRepository>();
+builder.Services.AddScoped<IAutomaticAssignmentService, AutomaticAssignmentService>();
 builder.Services.AddOptions<CandidateMatchingOptions>()
     .Bind(builder.Configuration.GetSection(CandidateMatchingOptions.SectionName));
 builder.Services.AddSingleton<RequiredSkillResolver>();
@@ -77,6 +80,8 @@ if (!string.IsNullOrWhiteSpace(kafkaBootstrapServers))
         kafkaBootstrapServers,
         serviceProvider.GetRequiredService<IServiceScopeFactory>(),
         serviceProvider.GetRequiredService<ILogger<JobCreatedConsumer>>()));
+    builder.Services.AddSingleton<IJobAssignedPublisher>(_ => new KafkaJobAssignedPublisher(kafkaBootstrapServers));
+    builder.Services.AddHostedService<JobAssignedOutboxPublisher>();
 }
 
 builder.Services.AddControllers()

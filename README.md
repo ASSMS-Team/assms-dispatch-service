@@ -29,6 +29,11 @@ starts with the Technician creation contract in
 | `GET` | `/api/technicians/{id}` | Retrieve a technician by Dispatch id. |
 | `PUT` | `/api/technicians/{id}` | Update technician capability data and skills atomically. |
 
+Automatic candidate evaluation and assignment are Kafka-driven. See
+[`US-06A`](docs/automatic-assignment/US-06A-eligible-technician-candidates.md)
+and [`US-06B`](docs/automatic-assignment/US-06B-lowest-workload-assignment.md)
+for the event, selection, and transactional-outbox contracts.
+
 ## Database Ownership
 
 ## Kafka Responsibilities

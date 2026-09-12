@@ -81,7 +81,10 @@ public class JobCreatedConsumerTests
     private static async Task RunAsync(CancellationTokenSource cts, FakeKafkaConsumer kafka, FakeCandidateEvaluationService evaluation, Action<ConsumerConfig>? configured = null)
     {
         kafka.OnMessagesExhausted = cts.Cancel;
-        await using var provider = new ServiceCollection().AddSingleton<ICandidateEvaluationService>(evaluation).BuildServiceProvider();
+        await using var provider = new ServiceCollection()
+            .AddSingleton<ICandidateEvaluationService>(evaluation)
+            .AddSingleton<IAutomaticAssignmentService>(new FakeAutomaticAssignmentService())
+            .BuildServiceProvider();
         var consumer = new JobCreatedConsumer(
             "localhost:9092", provider.GetRequiredService<IServiceScopeFactory>(), NullLogger<JobCreatedConsumer>.Instance,
             config => { configured?.Invoke(config); return kafka; });

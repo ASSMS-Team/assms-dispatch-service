@@ -90,12 +90,17 @@ public class JobCreatedConsumer : BackgroundService
                         continue;
                     }
 
-                    if (result.Value!.IsDuplicate)
-                        _logger.LogInformation("Ignoring duplicate JobCreated event {EventId} for job {JobId}.", envelope.EventId, envelope.Payload.JobId);
-                    else if (result.Value.CandidateCount == 0)
-                        _logger.LogWarning("Job {JobId} has no eligible technician; Dispatcher attention is required. Event {EventId}.", envelope.Payload.JobId, envelope.EventId);
+                    // US-06B deliberately runs even after a duplicate evaluation. A process
+                    // can fail after US-06A commits but before its assignment transaction;
+                    // the assignment repository is idempotent by job id and resumes safely.
+                    var assignmentService = scope.ServiceProvider.GetRequiredService<IAutomaticAssignmentService>();
+                    var assignment = await assignmentService.AssignAsync(envelope.EventId, envelope.Payload.JobId, stoppingToken);
+                    if (assignment.Outcome == DispatchService.Models.AutomaticAssignmentOutcome.Assigned)
+                        _logger.LogInformation("Assigned technician {TechnicianId} to job {JobId}. Event {EventId}.", assignment.Assignment!.TechnicianId, envelope.Payload.JobId, envelope.EventId);
+                    else if (assignment.Outcome == DispatchService.Models.AutomaticAssignmentOutcome.AlreadyAssigned)
+                        _logger.LogInformation("Ignoring repeat assignment processing for job {JobId}. Event {EventId}.", envelope.Payload.JobId, envelope.EventId);
                     else
-                        _logger.LogInformation("Found {CandidateCount} eligible technicians for job {JobId}. Event {EventId}.", result.Value.CandidateCount, envelope.Payload.JobId, envelope.EventId);
+                        _logger.LogWarning("Job {JobId} has no eligible technician; Dispatcher attention is required. Event {EventId}.", envelope.Payload.JobId, envelope.EventId);
 
                     consumer.Commit(message);
                 }
