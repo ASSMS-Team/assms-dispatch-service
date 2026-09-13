@@ -6,6 +6,7 @@ using System.Text.Json;
 using DispatchService.Repositories;
 using DispatchService.Security;
 using DispatchService.Services;
+using DispatchService.Messaging.Consumers;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -59,6 +60,23 @@ builder.Services.AddAuthorization();
 builder.Services.AddSingleton<IDbConnectionFactory>(new MySqlConnectionFactory(connectionString));
 builder.Services.AddScoped<ITechnicianRepository, TechnicianRepository>();
 builder.Services.AddScoped<TechnicianService>();
+builder.Services.AddScoped<ICandidateEvaluationRepository, CandidateEvaluationRepository>();
+builder.Services.AddScoped<ICandidateEvaluationService, CandidateEvaluationService>();
+builder.Services.AddOptions<CandidateMatchingOptions>()
+    .Bind(builder.Configuration.GetSection(CandidateMatchingOptions.SectionName));
+builder.Services.AddSingleton<RequiredSkillResolver>();
+
+var kafkaBootstrapServers = builder.Configuration["Kafka:BootstrapServers"];
+if (!string.IsNullOrWhiteSpace(kafkaBootstrapServers))
+{
+    // The consumer is intentionally not started when Kafka is not configured.
+    // That keeps the API usable for local technician work while making staging
+    // and Docker deployments opt in through their explicit Kafka setting.
+    builder.Services.AddHostedService(serviceProvider => new JobCreatedConsumer(
+        kafkaBootstrapServers,
+        serviceProvider.GetRequiredService<IServiceScopeFactory>(),
+        serviceProvider.GetRequiredService<ILogger<JobCreatedConsumer>>()));
+}
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
