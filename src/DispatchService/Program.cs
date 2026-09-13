@@ -58,6 +58,7 @@ builder.Services.AddAuthorization();
 // Add services to the container.
 
 builder.Services.AddSingleton<IDbConnectionFactory>(new MySqlConnectionFactory(connectionString));
+builder.Services.AddScoped<DispatchMigrationRunner>();
 builder.Services.AddScoped<ITechnicianRepository, TechnicianRepository>();
 builder.Services.AddScoped<TechnicianService>();
 builder.Services.AddScoped<ICandidateEvaluationRepository, CandidateEvaluationRepository>();
@@ -106,6 +107,13 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 var app = builder.Build();
+
+if (args.Contains("--apply-migrations", StringComparer.Ordinal))
+{
+    using var migrationScope = app.Services.CreateScope();
+    await migrationScope.ServiceProvider.GetRequiredService<DispatchMigrationRunner>().ApplyAsync();
+    return;
+}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
