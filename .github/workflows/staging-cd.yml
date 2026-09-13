@@ -62,20 +62,23 @@ jobs:
           chmod 600 ~/.ssh/dispatch_deploy_ed25519 ~/.ssh/known_hosts
 
       - name: Allow temporary SSH from this runner only
-        run: |
-          runner_ip="$(curl --fail --silent --show-error --retry 3 https://api.ipify.org)"
-          az network nsg rule create \
-            --resource-group "$AZURE_RESOURCE_GROUP" \
-            --nsg-name "$DISPATCH_NSG_NAME" \
-            --name "$TEMP_SSH_RULE_NAME" \
-            --priority "$DISPATCH_TEMP_SSH_RULE_PRIORITY" \
-            --direction Inbound \
-            --access Allow \
-            --protocol Tcp \
-            --source-address-prefixes "${runner_ip}/32" \
-            --source-port-ranges '*' \
-            --destination-address-prefixes '*' \
-            --destination-port-ranges 22
+        uses: azure/cli@v2
+        with:
+          azcliversion: 2.79.0
+          inlineScript: |
+            runner_ip="$(curl --fail --silent --show-error --retry 3 https://api.ipify.org)"
+            az network nsg rule create \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --nsg-name "$DISPATCH_NSG_NAME" \
+              --name "$TEMP_SSH_RULE_NAME" \
+              --priority "$DISPATCH_TEMP_SSH_RULE_PRIORITY" \
+              --direction Inbound \
+              --access Allow \
+              --protocol Tcp \
+              --source-address-prefixes "${runner_ip}/32" \
+              --source-port-ranges '*' \
+              --destination-address-prefixes '*' \
+              --destination-port-ranges 22
 
       - name: Transfer image and apply schema migrations
         run: |
@@ -109,8 +112,11 @@ jobs:
 
       - name: Remove temporary SSH rule
         if: always() && steps.azure_login.outcome == 'success'
-        run: |
-          az network nsg rule delete \
-            --resource-group "$AZURE_RESOURCE_GROUP" \
-            --nsg-name "$DISPATCH_NSG_NAME" \
-            --name "$TEMP_SSH_RULE_NAME" || true
+        uses: azure/cli@v2
+        with:
+          azcliversion: 2.79.0
+          inlineScript: |
+            az network nsg rule delete \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --nsg-name "$DISPATCH_NSG_NAME" \
+              --name "$TEMP_SSH_RULE_NAME" || true
