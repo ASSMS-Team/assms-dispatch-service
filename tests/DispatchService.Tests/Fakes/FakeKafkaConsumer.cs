@@ -39,7 +39,23 @@ public class FakeKafkaConsumer : IConsumer<string, string>
     public void Subscribe(string topic) => SubscribedTopics.Add(topic);
     public void Subscribe(IEnumerable<string> topics) => SubscribedTopics.AddRange(topics);
     public void Commit(ConsumeResult<string, string> result) => CommittedOffsets.Add(result.TopicPartitionOffset);
-    public void Seek(TopicPartitionOffset offset) => SeekedOffsets.Add(offset);
+    // The loop seeks back to a message whose processing failed, so that the next
+    // read returns it again. Re-queueing it here is what makes the fake behave
+    // the way the real consumer would and lets a test assert on the redelivery;
+    // recording the seek alone would leave the queue empty and end the run, so a
+    // retry could never be observed.
+    public void Seek(TopicPartitionOffset offset)
+    {
+        SeekedOffsets.Add(offset);
+
+        _messages.Enqueue(new ConsumeResult<string, string>
+        {
+            Topic = offset.Topic,
+            Partition = offset.Partition,
+            Offset = offset.Offset,
+            Message = LastConsumedMessage ?? new Message<string, string>(),
+        });
+    }
     public void Close() => CloseCallCount++;
     public void Dispose() { }
 
