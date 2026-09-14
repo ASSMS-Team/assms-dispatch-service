@@ -89,17 +89,23 @@ public class AutomaticAssignmentRepository : IAutomaticAssignmentRepository
         await connection.OpenAsync(cancellationToken);
         await using var command = connection.CreateCommand();
         command.CommandText = @"
-SELECT id, job_id, topic, payload, publish_attempts
-FROM assignment_outbox
-WHERE published_at IS NULL
-ORDER BY created_at, id
+SELECT o.id, a.job_id, o.topic, o.payload, o.publish_attempts
+FROM assignment_outbox o
+JOIN technician_assignments a ON a.id = o.assignment_id
+WHERE o.published_at IS NULL
+ORDER BY o.created_at, o.id
 LIMIT @limit;";
         command.Parameters.AddWithValue("@limit", Math.Clamp(limit, 1, 100));
 
         var result = new List<PendingJobAssignedEvent>();
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
-            result.Add(new(reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetInt32(4)));
+            result.Add(new(
+                Convert.ToString(reader.GetValue(0))!,
+                Convert.ToString(reader.GetValue(1))!,
+                reader.GetString(2),
+                reader.GetString(3),
+                reader.GetInt32(4)));
         return result;
     }
 
@@ -145,7 +151,13 @@ FOR UPDATE;";
         command.Parameters.AddWithValue("@jobId", jobId);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         if (!await reader.ReadAsync(cancellationToken)) return null;
-        return new(reader.GetString(0), reader.GetString(1), string.Empty, reader.GetString(2), reader.GetString(3), reader.GetDateTime(4));
+        return new(
+            Convert.ToString(reader.GetValue(0))!,
+            Convert.ToString(reader.GetValue(1))!,
+            string.Empty,
+            Convert.ToString(reader.GetValue(2))!,
+            reader.GetString(3),
+            reader.GetDateTime(4));
     }
 
     private static async Task<IReadOnlyList<AssignmentCandidate>> GetCandidatesAsync(MySqlConnection connection, MySqlTransaction transaction, string eventId, string jobId, CancellationToken cancellationToken)
@@ -171,7 +183,7 @@ GROUP BY t.id, t.technician_reference;";
         while (await reader.ReadAsync(cancellationToken))
         {
             candidates.Add(new(
-                reader.GetString(0), reader.GetString(1), Convert.ToInt32(reader.GetValue(2)),
+                Convert.ToString(reader.GetValue(0))!, reader.GetString(1), Convert.ToInt32(reader.GetValue(2)),
                 reader.IsDBNull(3) ? null : reader.GetDateTime(3)));
         }
         return candidates;
