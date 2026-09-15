@@ -101,3 +101,4 @@ jobs:
       commit_sha: ${{ github.sha }}
     secrets:
       DISPATCH_DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DISPATCH_DEPLOY_SSH_PRIVATE_KEY }}
+      DISPATCH_RUNTIME_ENV: ${{ secrets.DISPATCH_RUNTIME_ENV }}

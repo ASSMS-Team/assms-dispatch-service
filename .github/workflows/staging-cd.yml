@@ -9,6 +9,8 @@ on:
     secrets:
       DISPATCH_DEPLOY_SSH_PRIVATE_KEY:
         required: true
+      DISPATCH_RUNTIME_ENV:
+        required: true
 
 permissions:
   contents: read
@@ -98,6 +100,16 @@ jobs:
               --source-port-ranges '*' \
               --destination-address-prefixes '*' \
               --destination-port-ranges 22
+
+      - name: Install protected Dispatch runtime environment
+        env:
+          DISPATCH_RUNTIME_ENV: ${{ secrets.DISPATCH_RUNTIME_ENV }}
+        run: |
+          test -n "$DISPATCH_RUNTIME_ENV"
+          printf '%s\n' "$DISPATCH_RUNTIME_ENV" | ssh -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            -i ~/.ssh/dispatch_deploy_ed25519 \
+            "${DISPATCH_VM_SSH_USERNAME}@${DISPATCH_VM_HOST}" \
+            "sudo install -d -m 700 /etc/assms && sudo tee /etc/assms/dispatch.env >/dev/null && sudo chown root:root /etc/assms/dispatch.env && sudo chmod 600 /etc/assms/dispatch.env"
 
       - name: Transfer image and apply schema migrations
         run: |
