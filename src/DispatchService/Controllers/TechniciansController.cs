@@ -1,0 +1,103 @@
+using DispatchService.DTOs;
+using DispatchService.Security;
+using DispatchService.Services;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
+namespace DispatchService.Controllers;
+
+[ApiController]
+[Route("api/technicians")]
+[Produces("application/json")]
+[Authorize(Roles = StaffRoles.TechnicianManagement)]
+public class TechniciansController : ControllerBase
+{
+    private readonly TechnicianService _technicianService;
+
+    public TechniciansController(TechnicianService technicianService)
+    {
+        _technicianService = technicianService;
+    }
+
+    /// <summary>Creates a Dispatch-owned Technician record. This endpoint never creates a StaffAccount or writes to Customer &amp; Asset Service.</summary>
+    [HttpPost]
+    [ProducesResponseType(typeof(TechnicianResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Create([FromBody] CreateTechnicianRequest request)
+    {
+        var result = await _technicianService.CreateAsync(request);
+        if (result.Error == TechnicianCreateError.InvalidSkills)
+            return BadRequest(new ValidationProblemDetails(new Dictionary<string, string[]>
+            {
+                ["skills"] = new[] { "Provide at least one non-empty skill of at most 50 characters." },
+            }) { Status = StatusCodes.Status400BadRequest });
+
+        if (result.Error == TechnicianCreateError.DuplicateReference)
+            return Conflict(new ValidationProblemDetails(new Dictionary<string, string[]>
+            {
+                ["reference"] = new[] { "A technician already uses this reference." },
+            }) { Status = StatusCodes.Status409Conflict });
+
+        return CreatedAtAction(nameof(GetById), new { id = result.Value!.Id }, result.Value);
+    }
+
+    /// <summary>Returns all Dispatch-owned Technicians with their assignment capability fields.</summary>
+    [HttpGet]
+    [ProducesResponseType(typeof(IReadOnlyList<TechnicianResponse>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<TechnicianResponse>>> GetAll()
+    {
+        return Ok(await _technicianService.GetAllAsync());
+    }
+
+    /// <summary>Updates Dispatch-owned technician capability data and replaces its skill set atomically.</summary>
+    [HttpPut("{id}")]
+    [ProducesResponseType(typeof(TechnicianResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Update(string id, [FromBody] UpdateTechnicianRequest request)
+    {
+        var result = await _technicianService.UpdateAsync(id, request);
+        if (result.Error == TechnicianUpdateError.NotFound) return NotFound();
+        if (result.Error == TechnicianUpdateError.InvalidSkills)
+            return BadRequest(ValidationError("skills", "Provide at least one non-empty skill of at most 50 characters."));
+        if (result.Error == TechnicianUpdateError.InvalidRegion)
+            return BadRequest(ValidationError("region", "Region must be one of the nine supported provinces."));
+        return Ok(result.Value);
+    }
+
+    /// <summary>Soft-deactivates a Technician after confirming that no open assignment remains. The Technician and assignment history are retained. Repeating the request returns the current inactive Technician.</summary>
+    [HttpPost("{id}/deactivate")]
+    [ProducesResponseType(typeof(TechnicianResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Deactivate(string id)
+    {
+        var result = await _technicianService.DeactivateAsync(id);
+        if (result.Error == TechnicianDeactivationError.NotFound) return NotFound();
+        if (result.Error == TechnicianDeactivationError.HasOpenAssignments)
+            return Conflict(new ProblemDetails
+            {
+                Title = "Technician has open assignments.",
+                Detail = "Reassign or close the technician's open jobs before deactivation.",
+                Status = StatusCodes.Status409Conflict,
+            });
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>Returns a Technician by its Dispatch id.</summary>
+    [HttpGet("{id}")]
+    [ProducesResponseType(typeof(TechnicianResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetById(string id)
+    {
+        var technician = await _technicianService.GetByIdAsync(id);
+        return technician is null ? NotFound() : Ok(technician);
+    }
+
+    private static ValidationProblemDetails ValidationError(string field, string message) => new(new Dictionary<string, string[]>
+    {
+        [field] = new[] { message },
+    }) { Status = StatusCodes.Status400BadRequest };
+}

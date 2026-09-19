@@ -1,0 +1,153 @@
+name: Dispatch Service Staging CD
+
+on:
+  workflow_call:
+    inputs:
+      commit_sha:
+        required: true
+        type: string
+    secrets:
+      DISPATCH_DEPLOY_SSH_PRIVATE_KEY:
+        required: true
+      DISPATCH_RUNTIME_ENV:
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: dispatch-service-staging-deployment
+  cancel-in-progress: false
+
+jobs:
+  deploy-staging:
+    if: github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+      DISPATCH_API_URL: ${{ vars.DISPATCH_API_URL }}
+      DISPATCH_NSG_NAME: ${{ vars.DISPATCH_NSG_NAME }}
+      DISPATCH_TEMP_SSH_RULE_PRIORITY: ${{ vars.DISPATCH_TEMP_SSH_RULE_PRIORITY }}
+      DISPATCH_VM_HOST: ${{ vars.DISPATCH_VM_HOST }}
+      DISPATCH_VM_SSH_USERNAME: ${{ vars.DISPATCH_VM_SSH_USERNAME }}
+      DEPLOY_SHA: ${{ inputs.commit_sha }}
+      IMAGE_NAME: assms-dispatch-service
+      TEMP_SSH_RULE_NAME: gh-cd-dispatch-${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.commit_sha }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build exact ARM64 image
+        run: |
+          docker buildx build --platform linux/arm64 --load --tag "${IMAGE_NAME}:${DEPLOY_SHA}" .
+          test "$(docker image inspect --format '{{.Os}}/{{.Architecture}}' "${IMAGE_NAME}:${DEPLOY_SHA}")" = "linux/arm64"
+          docker save "${IMAGE_NAME}:${DEPLOY_SHA}" | gzip -c > dispatch-image.tar.gz
+
+      - uses: azure/login@v2
+        id: azure_login
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Prepare deployment SSH key
+        run: |
+          umask 077
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.DISPATCH_DEPLOY_SSH_PRIVATE_KEY }}" > ~/.ssh/dispatch_deploy_ed25519
+          printf '%s\n' "${{ vars.DISPATCH_VM_SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/dispatch_deploy_ed25519 ~/.ssh/known_hosts
+
+      - name: Resolve this runner's public IP
+        run: |
+          runner_ip="$(curl --fail --silent --show-error --retry 3 https://api.ipify.org)"
+          test -n "$runner_ip"
+          echo "RUNNER_IP=${runner_ip}" >> "$GITHUB_ENV"
+
+      - name: Allow temporary SSH from this runner only
+        id: temporary_ssh
+        uses: azure/cli@v2
+        with:
+          # Keep network commands on the same versioned CLI container used by
+          # the working Customer staging deployment.
+          azcliversion: 2.76.0
+          inlineScript: |
+            used_priorities="$(az network nsg rule list \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --nsg-name "$DISPATCH_NSG_NAME" \
+              --query "[?direction=='Inbound'].priority" \
+              --output tsv)"
+            rule_priority="$DISPATCH_TEMP_SSH_RULE_PRIORITY"
+            max_priority=$((DISPATCH_TEMP_SSH_RULE_PRIORITY + 99))
+            while printf '%s\n' "$used_priorities" | grep -qx "$rule_priority"; do
+              rule_priority=$((rule_priority + 1))
+              test "$rule_priority" -le "$max_priority"
+            done
+            az network nsg rule create \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --nsg-name "$DISPATCH_NSG_NAME" \
+              --name "$TEMP_SSH_RULE_NAME" \
+              --priority "$rule_priority" \
+              --direction Inbound \
+              --access Allow \
+              --protocol Tcp \
+              --source-address-prefixes "${RUNNER_IP}/32" \
+              --source-port-ranges '*' \
+              --destination-address-prefixes '*' \
+              --destination-port-ranges 22
+
+      - name: Install protected Dispatch runtime environment
+        env:
+          DISPATCH_RUNTIME_ENV: ${{ secrets.DISPATCH_RUNTIME_ENV }}
+        run: |
+          test -n "$DISPATCH_RUNTIME_ENV"
+          printf '%s\n' "$DISPATCH_RUNTIME_ENV" | ssh -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            -i ~/.ssh/dispatch_deploy_ed25519 \
+            "${DISPATCH_VM_SSH_USERNAME}@${DISPATCH_VM_HOST}" \
+            "sudo install -d -m 700 /etc/assms && sudo tee /etc/assms/dispatch.env >/dev/null && sudo chown root:root /etc/assms/dispatch.env && sudo chmod 600 /etc/assms/dispatch.env"
+
+      - name: Transfer image and apply schema migrations
+        run: |
+          scp -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -i ~/.ssh/dispatch_deploy_ed25519 \
+            dispatch-image.tar.gz "${DISPATCH_VM_SSH_USERNAME}@${DISPATCH_VM_HOST}:/tmp/dispatch-image-${DEPLOY_SHA}.tar.gz"
+          ssh -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -i ~/.ssh/dispatch_deploy_ed25519 \
+            "${DISPATCH_VM_SSH_USERNAME}@${DISPATCH_VM_HOST}" \
+            "sudo docker load -i /tmp/dispatch-image-${DEPLOY_SHA}.tar.gz && \
+             sudo rm -f /tmp/dispatch-image-${DEPLOY_SHA}.tar.gz && \
+             sudo docker run --rm --env-file /etc/assms/dispatch.env \
+               ${IMAGE_NAME}:${DEPLOY_SHA} --apply-migrations"
+
+      - name: Replace Dispatch container
+        run: |
+          ssh -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -i ~/.ssh/dispatch_deploy_ed25519 \
+            "${DISPATCH_VM_SSH_USERNAME}@${DISPATCH_VM_HOST}" \
+            "(sudo docker rm -f assms-dispatch-service || true) && \
+             sudo docker run -d --name assms-dispatch-service --restart unless-stopped \
+               --env-file /etc/assms/dispatch.env -p 127.0.0.1:8080:8080 \
+               ${IMAGE_NAME}:${DEPLOY_SHA} && \
+             sudo systemctl is-active --quiet nginx && \
+             sudo docker ps --filter name=assms-dispatch-service --format '{{.Image}}' | \
+               grep -Fx '${IMAGE_NAME}:${DEPLOY_SHA}'"
+
+      - name: Verify public HTTPS health
+        run: |
+          for path in /api/health /api/health/db; do
+            test "$(curl --fail --silent --show-error --retry 12 --retry-delay 5 \
+              --output /dev/null --write-out '%{http_code}' "${DISPATCH_API_URL}${path}")" = "200"
+          done
+
+      - name: Remove temporary SSH rule
+        if: always() && steps.azure_login.outcome == 'success'
+        uses: azure/cli@v2
+        with:
+          azcliversion: 2.76.0
+          inlineScript: |
+            az network nsg rule delete \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --nsg-name "$DISPATCH_NSG_NAME" \
+              --name "$TEMP_SSH_RULE_NAME" || true
