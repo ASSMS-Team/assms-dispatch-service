@@ -11,8 +11,12 @@ public interface IAutomaticAssignmentRepository
     Task<AutomaticAssignmentResult> AssignFromCandidateEvaluationAsync(
         string eventId, string jobId, DateTime assignedAt, CancellationToken cancellationToken = default);
 
+    /// <summary>Returns live (non-released, non-terminal) assignments for a technician.</summary>
+    Task<IReadOnlyList<AssignmentRecord>> GetByTechnicianIdAsync(string technicianId, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<PendingJobAssignedEvent>> GetPendingJobAssignedEventsAsync(
         int limit, CancellationToken cancellationToken = default);
     Task MarkJobAssignedPublishedAsync(string eventId, DateTime publishedAt, CancellationToken cancellationToken = default);
     Task MarkJobAssignedFailedAsync(string eventId, string reason, CancellationToken cancellationToken = default);
 }
+
