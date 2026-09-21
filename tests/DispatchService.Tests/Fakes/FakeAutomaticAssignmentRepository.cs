@@ -10,6 +10,7 @@ public class FakeAutomaticAssignmentRepository : IAutomaticAssignmentRepository
     public string? ReceivedJobId { get; private set; }
     public AutomaticAssignmentResult AssignmentResult { get; set; } = new(AutomaticAssignmentOutcome.Assigned, null);
     public IReadOnlyList<PendingJobAssignedEvent> PendingEvents { get; set; } = Array.Empty<PendingJobAssignedEvent>();
+    public IReadOnlyList<AssignmentRecord> AssignmentsToReturn { get; set; } = Array.Empty<AssignmentRecord>();
     public List<string> PublishedEventIds { get; } = [];
     public List<(string EventId, string Reason)> FailedEvents { get; } = [];
 
@@ -20,6 +21,9 @@ public class FakeAutomaticAssignmentRepository : IAutomaticAssignmentRepository
         ReceivedJobId = jobId;
         return Task.FromResult(AssignmentResult);
     }
+
+    public Task<IReadOnlyList<AssignmentRecord>> GetByTechnicianIdAsync(string technicianId, CancellationToken cancellationToken = default)
+        => Task.FromResult(AssignmentsToReturn);
 
     public Task<IReadOnlyList<PendingJobAssignedEvent>> GetPendingJobAssignedEventsAsync(int limit, CancellationToken cancellationToken = default) => Task.FromResult(PendingEvents);
     public Task MarkJobAssignedPublishedAsync(string eventId, DateTime publishedAt, CancellationToken cancellationToken = default)

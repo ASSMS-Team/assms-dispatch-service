@@ -53,5 +53,11 @@ public class FakeTechnicianRepository : ITechnicianRepository
         return Task.FromResult(TechnicianToReturn);
     }
 
+    public Task<Technician?> GetByReferenceAsync(string reference)
+    {
+        CheckedReference = reference;
+        return Task.FromResult(TechnicianToReturn);
+    }
+
     public Task<IReadOnlyList<Technician>> GetAllAsync() => Task.FromResult(TechniciansToReturn);
 }

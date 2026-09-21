@@ -66,6 +66,7 @@ builder.Services.AddScoped<ICandidateEvaluationRepository, CandidateEvaluationRe
 builder.Services.AddScoped<ICandidateEvaluationService, CandidateEvaluationService>();
 builder.Services.AddScoped<IAutomaticAssignmentRepository, AutomaticAssignmentRepository>();
 builder.Services.AddScoped<IAutomaticAssignmentService, AutomaticAssignmentService>();
+builder.Services.AddScoped<MyAssignmentsService>();
 builder.Services.AddOptions<CandidateMatchingOptions>()
     .Bind(builder.Configuration.GetSection(CandidateMatchingOptions.SectionName));
 builder.Services.AddSingleton<RequiredSkillResolver>();

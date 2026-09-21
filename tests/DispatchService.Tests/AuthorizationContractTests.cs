@@ -16,4 +16,15 @@ public sealed class AuthorizationContractTests
 
         Assert.Equal(StaffRoles.TechnicianManagement, authorization.Roles);
     }
+
+    [Fact]
+    public void MyAssignmentsEndpoint_RequiresTechnicianRole()
+    {
+        var authorization = typeof(MyAssignmentsController)
+            .GetCustomAttributes(typeof(AuthorizeAttribute), inherit: true)
+            .Cast<AuthorizeAttribute>()
+            .Single();
+
+        Assert.Equal(StaffRoles.Technician, authorization.Roles);
+    }
 }

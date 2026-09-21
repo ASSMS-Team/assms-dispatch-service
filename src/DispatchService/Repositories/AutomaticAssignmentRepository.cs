@@ -109,6 +109,41 @@ LIMIT @limit;";
         return result;
     }
 
+    public async Task<IReadOnlyList<AssignmentRecord>> GetByTechnicianIdAsync(string technicianId, CancellationToken cancellationToken = default)
+    {
+        await using var connection = _connectionFactory.CreateConnection();
+        await connection.OpenAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        // Only return live assignments: not released and not in a terminal status.
+        // The job_reference is recovered from the evaluation record written by US-06A.
+        command.CommandText = @"
+SELECT a.id, a.job_id,
+       COALESCE((SELECT e.job_reference
+                 FROM job_candidate_evaluations e
+                 WHERE e.job_id = a.job_id
+                 LIMIT 1), '') AS job_reference,
+       a.technician_id, t.technician_reference, a.assigned_at
+FROM technician_assignments a
+JOIN technicians t ON t.id = a.technician_id
+WHERE a.technician_id = @technicianId
+  AND a.released_at IS NULL
+  AND UPPER(a.job_status) NOT IN ('COMPLETED', 'CANCELLED')
+ORDER BY a.assigned_at DESC;";
+        command.Parameters.AddWithValue("@technicianId", technicianId);
+
+        var results = new List<AssignmentRecord>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+            results.Add(new(
+                Convert.ToString(reader.GetValue(0))!,
+                Convert.ToString(reader.GetValue(1))!,
+                reader.GetString(2),
+                Convert.ToString(reader.GetValue(3))!,
+                reader.GetString(4),
+                reader.GetDateTime(5)));
+        return results;
+    }
+
     public async Task MarkJobAssignedPublishedAsync(string eventId, DateTime publishedAt, CancellationToken cancellationToken = default)
     {
         await using var connection = _connectionFactory.CreateConnection();

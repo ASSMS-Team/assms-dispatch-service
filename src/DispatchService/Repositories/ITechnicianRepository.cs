@@ -12,4 +12,5 @@ public interface ITechnicianRepository
     Task<TechnicianDeactivationPersistenceResult> DeactivateAsync(string id);
     Task<IReadOnlyList<Technician>> GetAllAsync();
     Task<Technician?> GetByIdAsync(string id);
+    Task<Technician?> GetByReferenceAsync(string reference);
 }
