@@ -2,12 +2,16 @@ using System.Text.Json;
 using Confluent.Kafka;
 using DispatchService.Messaging.Contracts;
 using DispatchService.Services;
+using Prometheus;
 
 namespace DispatchService.Messaging.Consumers;
 
 /// <summary>Consumes JobCreated events and records eligible Dispatch candidates.</summary>
 public class JobCreatedConsumer : BackgroundService
 {
+    private static readonly Counter EventsConsumedCounter = Metrics.CreateCounter(
+        "assms_kafka_events_consumed_total", "Total Kafka events processed by consumer",
+        new CounterConfiguration { LabelNames = new[] { "topic", "consumer_group", "status" } });
     private static readonly TimeSpan WriteRetryDelay = TimeSpan.FromSeconds(5);
     private static readonly JsonSerializerOptions SerializerOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
@@ -103,9 +107,11 @@ public class JobCreatedConsumer : BackgroundService
                         _logger.LogWarning("Job {JobId} has no eligible technician; Dispatcher attention is required. Event {EventId}.", envelope.Payload.JobId, envelope.EventId);
 
                     consumer.Commit(message);
+                    EventsConsumedCounter.WithLabels(JobCreatedPayload.Topic, JobCreatedPayload.ConsumerGroup, "success").Inc();
                 }
                 catch (Exception exception)
                 {
+                    EventsConsumedCounter.WithLabels(JobCreatedPayload.Topic, JobCreatedPayload.ConsumerGroup, "failed").Inc();
                     _logger.LogError(exception, "Evaluating JobCreated at {Offset} failed. It will be retried.", message.TopicPartitionOffset);
                     consumer.Seek(message.TopicPartitionOffset);
                     await Task.Delay(WriteRetryDelay, stoppingToken);
