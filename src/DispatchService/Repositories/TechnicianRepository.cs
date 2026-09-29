@@ -18,7 +18,7 @@ public class TechnicianRepository : ITechnicianRepository
         await connection.OpenAsync();
         await using var command = connection.CreateCommand();
         command.CommandText = "SELECT 1 FROM technicians WHERE technician_reference = @reference LIMIT 1;";
-        command.Parameters.AddWithValue("@reference", reference);
+        command.Parameters.AddWithValue("@reference", reference?.Trim().ToUpperInvariant() ?? string.Empty);
         return await command.ExecuteScalarAsync() is not null;
     }
 
@@ -289,7 +289,7 @@ FROM technicians t
 LEFT JOIN technician_skills ts ON ts.technician_id = t.id
 WHERE t.technician_reference = @reference
 ORDER BY ts.skill;";
-        command.Parameters.AddWithValue("@reference", reference);
+        command.Parameters.AddWithValue("@reference", reference?.Trim().ToUpperInvariant() ?? string.Empty);
 
         await using var reader = await command.ExecuteReaderAsync();
         Technician? technician = null;

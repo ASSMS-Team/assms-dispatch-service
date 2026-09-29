@@ -34,7 +34,8 @@ public class MyAssignmentsService
     /// </summary>
     public async Task<MyAssignmentsResult> GetAssignmentsAsync(string technicianReference, CancellationToken cancellationToken = default)
     {
-        var technician = await _technicianRepository.GetByReferenceAsync(technicianReference);
+        var normalizedReference = technicianReference?.Trim().ToUpperInvariant() ?? string.Empty;
+        var technician = await _technicianRepository.GetByReferenceAsync(normalizedReference);
         if (technician is null)
             return new(null, MyAssignmentsError.TechnicianNotFound);
 

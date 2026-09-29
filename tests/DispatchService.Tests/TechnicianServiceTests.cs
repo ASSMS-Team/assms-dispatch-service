@@ -39,6 +39,29 @@ public class TechnicianServiceTests
     }
 
     [Fact]
+    public async Task CreateAsync_WithDotInReference_CreatesTechnicianWithUppercaseReference()
+    {
+        var repository = new FakeTechnicianRepository();
+        var service = new TechnicianService(repository);
+
+        var request = new CreateTechnicianRequest
+        {
+            Reference = "technician.local",
+            FullName = "Sawan Magedaragama",
+            Region = "WESTERN",
+            Status = "ACTIVE",
+            Skills = ["Electrical"],
+        };
+
+        var result = await service.CreateAsync(request);
+
+        Assert.Equal(TechnicianCreateError.None, result.Error);
+        Assert.NotNull(repository.CreatedTechnician);
+        Assert.Equal("TECHNICIAN.LOCAL", repository.CreatedTechnician.Reference);
+        Assert.Equal("TECHNICIAN.LOCAL", result.Value!.Reference);
+    }
+
+    [Fact]
     public async Task CreateAsync_WhenReferenceExists_ReturnsDuplicateReferenceWithoutWriting()
     {
         var repository = new FakeTechnicianRepository { ReferenceExists = true };
