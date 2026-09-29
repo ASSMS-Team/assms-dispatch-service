@@ -4,10 +4,10 @@ namespace DispatchService.DTOs;
 
 public class CreateTechnicianRequest
 {
-    /// <summary>Unique Dispatch reference, for example TEC-032. Case-insensitive and stored in uppercase.</summary>
+    /// <summary>Unique Dispatch reference, for example TEC-032 or technician.local. Case-insensitive and stored in uppercase.</summary>
     [Required]
     [MaxLength(30)]
-    [RegularExpression("^[A-Za-z0-9][A-Za-z0-9-]{1,29}$", ErrorMessage = "Reference must contain only letters, numbers and hyphens.")]
+    [RegularExpression("^[A-Za-z0-9][A-Za-z0-9.-]{1,29}$", ErrorMessage = "Reference must contain only letters, numbers, hyphens and dots.")]
     public string Reference { get; set; } = string.Empty;
 
     /// <summary>Technician's full name. Required, up to 150 characters.</summary>

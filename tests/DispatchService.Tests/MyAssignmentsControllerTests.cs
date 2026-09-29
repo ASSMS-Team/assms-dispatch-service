@@ -118,4 +118,23 @@ public class MyAssignmentsControllerTests
         Assert.Single(assignments);
         Assert.Equal("TEC-001", techRepo.CheckedReference);
     }
+
+    [Fact]
+    public async Task GetMyAssignments_WhenUniqueNameHasDot_ResolvesNormalizedTechnicianReference()
+    {
+        var techRepo = new FakeTechnicianRepository
+        {
+            TechnicianToReturn = new Technician { Id = "tech-1", Reference = "TECHNICIAN.LOCAL" },
+        };
+        var assignRepo = new FakeAutomaticAssignmentRepository
+        {
+            AssignmentsToReturn = [],
+        };
+        var controller = BuildController(techRepo, assignRepo, uniqueName: "technician.local");
+
+        var result = Assert.IsType<OkObjectResult>(await controller.GetMyAssignments(default));
+
+        Assert.Empty(Assert.IsAssignableFrom<IReadOnlyList<DTOs.MyAssignmentResponse>>(result.Value));
+        Assert.Equal("TECHNICIAN.LOCAL", techRepo.CheckedReference);
+    }
 }
