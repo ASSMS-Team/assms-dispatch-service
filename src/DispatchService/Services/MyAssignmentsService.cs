@@ -39,7 +39,20 @@ public class MyAssignmentsService
         if (technician is null)
             return new(null, MyAssignmentsError.TechnicianNotFound);
 
-        var assignments = await _assignmentRepository.GetByTechnicianIdAsync(technician.Id, cancellationToken);
+        return await GetForTechnicianAsync(technician.Id, cancellationToken);
+    }
+
+    public async Task<MyAssignmentsResult> GetByTechnicianIdAsync(string technicianId, CancellationToken cancellationToken = default)
+    {
+        var technician = await _technicianRepository.GetByIdAsync(technicianId);
+        if (technician is null) return new(null, MyAssignmentsError.TechnicianNotFound);
+        return await GetForTechnicianAsync(technician.Id, cancellationToken);
+    }
+
+    private async Task<MyAssignmentsResult> GetForTechnicianAsync(string technicianId, CancellationToken cancellationToken)
+    {
+
+        var assignments = await _assignmentRepository.GetByTechnicianIdAsync(technicianId, cancellationToken);
 
         var response = assignments
             .Select(a => new MyAssignmentResponse

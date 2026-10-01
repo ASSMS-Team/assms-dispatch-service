@@ -11,6 +11,36 @@ namespace DispatchService.Tests;
 
 public class MyAssignmentsControllerTests
 {
+    [Fact]
+    public async Task ExplicitLinkResolvesByTechnicianIdInsteadOfUsername()
+    {
+        var id = Guid.NewGuid().ToString();
+        var repo = new FakeTechnicianRepository { TechnicianToReturn = new Technician { Id = id, Reference = "TEC-032" } };
+        var controller = BuildController(repo, new FakeAutomaticAssignmentRepository(), "different.login");
+        ((ClaimsIdentity)controller.User.Identity!).AddClaim(new Claim("technician_id", id));
+        Assert.IsType<OkObjectResult>(await controller.GetMyAssignments(default));
+        Assert.Equal(id, repo.RequestedId); Assert.Null(repo.CheckedReference);
+    }
+
+    [Fact]
+    public async Task MissingLinkedProfileDoesNotFallbackToAUsernameMatch()
+    {
+        var repo = new FakeTechnicianRepository();
+        var controller = BuildController(repo, new FakeAutomaticAssignmentRepository());
+        ((ClaimsIdentity)controller.User.Identity!).AddClaim(new Claim("technician_id", Guid.NewGuid().ToString()));
+        Assert.IsType<NotFoundResult>(await controller.GetMyAssignments(default));
+        Assert.Null(repo.CheckedReference);
+    }
+
+    [Fact]
+    public async Task InvalidExplicitIdIsRejectedWithoutUsingClientSuppliedIdentity()
+    {
+        var repo = new FakeTechnicianRepository();
+        var controller = BuildController(repo, new FakeAutomaticAssignmentRepository());
+        ((ClaimsIdentity)controller.User.Identity!).AddClaim(new Claim("technician_id", "invalid"));
+        Assert.IsType<UnauthorizedResult>(await controller.GetMyAssignments(default));
+        Assert.Null(repo.RequestedId); Assert.Null(repo.CheckedReference);
+    }
     // Wires a ClaimsPrincipal that matches what the JWT middleware produces for
     // a Technician: unique_name = technicianReference, role = Technician.
     private static MyAssignmentsController BuildController(
