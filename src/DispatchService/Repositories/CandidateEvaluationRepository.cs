@@ -28,12 +28,17 @@ public class CandidateEvaluationRepository : ICandidateEvaluationRepository
                 reserve.Transaction = transaction;
                 reserve.CommandText = @"
 INSERT INTO job_candidate_evaluations
-    (event_id, job_id, job_reference, required_skill, normalized_region, evaluation_status, candidate_count, occurred_at)
+    (event_id, job_id, job_reference, service_category, priority, problem_description,
+     required_skill, normalized_region, evaluation_status, candidate_count, occurred_at)
 VALUES
-    (@eventId, @jobId, @jobReference, @requiredSkill, @region, 'PROCESSING', 0, @occurredAt);";
+    (@eventId, @jobId, @jobReference, @serviceCategory, @priority, @problemDescription,
+     @requiredSkill, @region, 'PROCESSING', 0, @occurredAt);";
                 reserve.Parameters.AddWithValue("@eventId", evaluation.EventId);
                 reserve.Parameters.AddWithValue("@jobId", evaluation.JobId);
                 reserve.Parameters.AddWithValue("@jobReference", evaluation.JobReference);
+                reserve.Parameters.AddWithValue("@serviceCategory", (object?)evaluation.ServiceCategory ?? DBNull.Value);
+                reserve.Parameters.AddWithValue("@priority", (object?)evaluation.Priority ?? DBNull.Value);
+                reserve.Parameters.AddWithValue("@problemDescription", (object?)evaluation.ProblemDescription ?? DBNull.Value);
                 reserve.Parameters.AddWithValue("@requiredSkill", evaluation.RequiredSkill);
                 reserve.Parameters.AddWithValue("@region", evaluation.NormalizedRegion);
                 reserve.Parameters.AddWithValue("@occurredAt", evaluation.OccurredAt);

@@ -16,7 +16,7 @@ public class CandidateEvaluationServiceTests
         var service = CreateService(repository);
 
         var result = await service.EvaluateAsync(
-            EventId, "JobCreated", 1, "job-service", JobId, "JOB-123", "REPAIR", " western ",
+            EventId, "JobCreated", 1, "job-service", JobId, "JOB-123", "REPAIR", " western ", "high", "  AC unit not cooling  ",
             new DateTime(2026, 9, 10, 7, 30, 0, DateTimeKind.Utc));
 
         Assert.Equal(CandidateEvaluationError.None, result.Error);
@@ -27,6 +27,23 @@ public class CandidateEvaluationServiceTests
         Assert.Equal("AC", written.RequiredSkill);
         Assert.Equal("WESTERN", written.NormalizedRegion);
         Assert.Equal(DateTimeKind.Utc, written.OccurredAt.Kind);
+        Assert.Equal("REPAIR", written.ServiceCategory);
+        Assert.Equal("HIGH", written.Priority);
+        Assert.Equal("AC unit not cooling", written.ProblemDescription);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_WithoutSummaryFields_StoresNullsInsteadOfQuarantining()
+    {
+        var repository = new FakeCandidateEvaluationRepository { Result = new(false, 1) };
+        var service = CreateService(repository);
+
+        var result = await service.EvaluateAsync(
+            EventId, "JobCreated", 1, "job-service", JobId, "JOB-123", "REPAIR", "WESTERN", null, "  ", DateTime.UtcNow);
+
+        Assert.Equal(CandidateEvaluationError.None, result.Error);
+        Assert.Null(repository.ReceivedEvaluation!.Priority);
+        Assert.Null(repository.ReceivedEvaluation.ProblemDescription);
     }
 
     [Fact]
@@ -36,7 +53,7 @@ public class CandidateEvaluationServiceTests
         var service = CreateService(repository);
 
         var result = await service.EvaluateAsync(
-            EventId, "JobCreated", 1, "job-service", JobId, "JOB-123", "REPAIR", "WESTERN", DateTime.UtcNow);
+            EventId, "JobCreated", 1, "job-service", JobId, "JOB-123", "REPAIR", "WESTERN", "HIGH", "AC unit not cooling", DateTime.UtcNow);
 
         Assert.Equal(CandidateEvaluationError.None, result.Error);
         Assert.Equal(0, result.Value!.CandidateCount);
@@ -51,7 +68,7 @@ public class CandidateEvaluationServiceTests
         var service = CreateService(repository);
 
         var result = await service.EvaluateAsync(
-            EventId, "JobCreated", 1, "job-service", JobId, "JOB-123", "REPAIR", "WESTERN", DateTime.UtcNow);
+            EventId, "JobCreated", 1, "job-service", JobId, "JOB-123", "REPAIR", "WESTERN", "HIGH", "AC unit not cooling", DateTime.UtcNow);
 
         Assert.Equal(CandidateEvaluationError.None, result.Error);
         Assert.True(result.Value!.IsDuplicate);
@@ -65,7 +82,7 @@ public class CandidateEvaluationServiceTests
         var service = CreateService(repository);
 
         var result = await service.EvaluateAsync(
-            EventId, "JobCreated", 1, "job-service", JobId, "JOB-123", "WARRANTY_CLAIM", "WESTERN", DateTime.UtcNow);
+            EventId, "JobCreated", 1, "job-service", JobId, "JOB-123", "WARRANTY_CLAIM", "WESTERN", "HIGH", "AC unit not cooling", DateTime.UtcNow);
 
         Assert.Equal(CandidateEvaluationError.UnmappedServiceCategory, result.Error);
         Assert.Equal(0, repository.CallCount);
@@ -83,7 +100,7 @@ public class CandidateEvaluationServiceTests
         var service = CreateService(repository);
 
         var result = await service.EvaluateAsync(
-            eventId, eventType, eventVersion, producer, JobId, "JOB-123", "REPAIR", "WESTERN", DateTime.UtcNow);
+            eventId, eventType, eventVersion, producer, JobId, "JOB-123", "REPAIR", "WESTERN", "HIGH", "AC unit not cooling", DateTime.UtcNow);
 
         Assert.Equal(CandidateEvaluationError.InvalidEvent, result.Error);
         Assert.Equal(0, repository.CallCount);

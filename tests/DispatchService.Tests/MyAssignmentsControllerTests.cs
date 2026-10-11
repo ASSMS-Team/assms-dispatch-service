@@ -63,6 +63,34 @@ public class MyAssignmentsControllerTests
     }
 
     [Fact]
+    public async Task GetMyAssignments_ReturnsPriorityLocationAndSummaryForFieldWork()
+    {
+        var techRepo = new FakeTechnicianRepository { TechnicianToReturn = new Technician { Id = "tech-1", Reference = "TEC-001" } };
+        var assignRepo = new FakeAutomaticAssignmentRepository
+        {
+            AssignmentsToReturn =
+            [
+                new AssignmentRecord("assignment-1", "job-1", "JOB-ABC123", "tech-1", "TEC-001", DateTime.UtcNow)
+                {
+                    Priority = "URGENT", ServiceCategory = "REPAIR", Region = "UVA", ProblemDescription = "AC unit not cooling",
+                    JobStatus = "IN_PROGRESS",
+                },
+            ],
+        };
+        var controller = BuildController(techRepo, assignRepo);
+
+        var result = Assert.IsType<OkObjectResult>(await controller.GetMyAssignments(default));
+
+        var item = Assert.Single(Assert.IsAssignableFrom<IReadOnlyList<DTOs.MyAssignmentResponse>>(result.Value));
+        Assert.Equal("JOB-ABC123", item.JobReference);
+        Assert.Equal("URGENT", item.Priority);
+        Assert.Equal("REPAIR", item.ServiceCategory);
+        Assert.Equal("UVA", item.Region);
+        Assert.Equal("AC unit not cooling", item.ProblemDescription);
+        Assert.Equal("IN_PROGRESS", item.JobStatus);
+    }
+
+    [Fact]
     public async Task GetMyAssignments_WhenTechnicianHasNoAssignments_ReturnsOkWithEmptyArray()
     {
         var techRepo = new FakeTechnicianRepository

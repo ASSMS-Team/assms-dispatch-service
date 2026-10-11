@@ -18,6 +18,8 @@ public interface ICandidateEvaluationService
         string jobReference,
         string serviceCategory,
         string region,
+        string? priority,
+        string? problemDescription,
         DateTime occurredAt);
 }
 
@@ -43,6 +45,8 @@ public class CandidateEvaluationService : ICandidateEvaluationService
         string jobReference,
         string serviceCategory,
         string region,
+        string? priority,
+        string? problemDescription,
         DateTime occurredAt)
     {
         if (!Guid.TryParse(eventId, out _) || !Guid.TryParse(jobId, out _) ||
@@ -60,6 +64,9 @@ public class CandidateEvaluationService : ICandidateEvaluationService
             EventId = eventId,
             JobId = jobId,
             JobReference = jobReference.Trim(),
+            ServiceCategory = NullIfBlank(serviceCategory)?.ToUpperInvariant(),
+            Priority = NullIfBlank(priority)?.ToUpperInvariant(),
+            ProblemDescription = NullIfBlank(problemDescription),
             RequiredSkill = requiredSkill,
             NormalizedRegion = region.Trim().ToUpperInvariant(),
             OccurredAt = occurredAt.ToUniversalTime(),
@@ -67,4 +74,9 @@ public class CandidateEvaluationService : ICandidateEvaluationService
 
         return new(result, CandidateEvaluationError.None);
     }
+
+    // Summary fields are display-only, so a missing value is stored as NULL
+    // rather than quarantining an otherwise valid JobCreated event.
+    private static string? NullIfBlank(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

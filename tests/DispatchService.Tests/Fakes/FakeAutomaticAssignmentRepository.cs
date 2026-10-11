@@ -25,6 +25,19 @@ public class FakeAutomaticAssignmentRepository : IAutomaticAssignmentRepository
     public Task<IReadOnlyList<AssignmentRecord>> GetByTechnicianIdAsync(string technicianId, CancellationToken cancellationToken = default)
         => Task.FromResult(AssignmentsToReturn);
 
+    public List<(string JobId, string JobStatus, int StatusRank)> StatusUpdates { get; } = [];
+    public bool UpdateJobStatusResult { get; set; } = true;
+    public Exception? UpdateJobStatusException { get; set; }
+    public Action? OnUpdateJobStatus { get; set; }
+
+    public Task<bool> UpdateJobStatusAsync(string jobId, string jobStatus, int statusRank, CancellationToken cancellationToken = default)
+    {
+        StatusUpdates.Add((jobId, jobStatus, statusRank));
+        OnUpdateJobStatus?.Invoke();
+        if (UpdateJobStatusException is not null) throw UpdateJobStatusException;
+        return Task.FromResult(UpdateJobStatusResult);
+    }
+
     public Task<IReadOnlyList<PendingJobAssignedEvent>> GetPendingJobAssignedEventsAsync(int limit, CancellationToken cancellationToken = default) => Task.FromResult(PendingEvents);
     public Task MarkJobAssignedPublishedAsync(string eventId, DateTime publishedAt, CancellationToken cancellationToken = default)
     {

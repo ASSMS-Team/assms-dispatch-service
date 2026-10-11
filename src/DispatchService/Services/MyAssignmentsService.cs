@@ -60,7 +60,11 @@ public class MyAssignmentsService
                 AssignmentId = a.Id,
                 JobId = a.JobId,
                 JobReference = a.JobReference,
-                JobStatus = "ASSIGNED",
+                Priority = a.Priority,
+                ServiceCategory = a.ServiceCategory,
+                Region = a.Region,
+                ProblemDescription = a.ProblemDescription,
+                JobStatus = a.JobStatus,
                 AssignedAt = a.AssignedAt,
             })
             .ToList();

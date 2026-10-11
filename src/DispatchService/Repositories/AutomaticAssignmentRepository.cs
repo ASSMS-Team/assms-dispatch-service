@@ -115,16 +115,20 @@ LIMIT @limit;";
         await connection.OpenAsync(cancellationToken);
         await using var command = connection.CreateCommand();
         // Only return live assignments: not released and not in a terminal status.
-        // The job_reference is recovered from the evaluation record written by US-06A.
+        // The job reference and summary are recovered from the latest evaluation
+        // record written by US-06A for the job.
         command.CommandText = @"
 SELECT a.id, a.job_id,
-       COALESCE((SELECT e.job_reference
-                 FROM job_candidate_evaluations e
-                 WHERE e.job_id = a.job_id
-                 LIMIT 1), '') AS job_reference,
-       a.technician_id, t.technician_reference, a.assigned_at
+       COALESCE(e.job_reference, '') AS job_reference,
+       a.technician_id, t.technician_reference, a.assigned_at,
+       e.service_category, e.priority, e.normalized_region, e.problem_description,
+       a.job_status
 FROM technician_assignments a
 JOIN technicians t ON t.id = a.technician_id
+LEFT JOIN job_candidate_evaluations e
+       ON e.id = (SELECT MAX(latest.id)
+                  FROM job_candidate_evaluations latest
+                  WHERE latest.job_id = a.job_id)
 WHERE a.technician_id = @technicianId
   AND a.released_at IS NULL
   AND UPPER(a.job_status) NOT IN ('COMPLETED', 'CANCELLED')
@@ -140,8 +144,38 @@ ORDER BY a.assigned_at DESC;";
                 reader.GetString(2),
                 Convert.ToString(reader.GetValue(3))!,
                 reader.GetString(4),
-                reader.GetDateTime(5)));
+                DbDateTime.ReadUtc(reader, 5))
+            {
+                ServiceCategory = reader.IsDBNull(6) ? null : reader.GetString(6),
+                Priority = reader.IsDBNull(7) ? null : reader.GetString(7),
+                Region = reader.IsDBNull(8) ? null : reader.GetString(8),
+                ProblemDescription = reader.IsDBNull(9) ? null : reader.GetString(9),
+                JobStatus = reader.GetString(10),
+            });
         return results;
+    }
+
+    public async Task<bool> UpdateJobStatusAsync(string jobId, string jobStatus, int statusRank, CancellationToken cancellationToken = default)
+    {
+        await using var connection = _connectionFactory.CreateConnection();
+        await connection.OpenAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        // The CASE ranks must match AssignmentStatusService.StatusRank.
+        command.CommandText = @"
+UPDATE technician_assignments
+SET job_status = @jobStatus
+WHERE job_id = @jobId
+  AND (CASE UPPER(job_status)
+           WHEN 'ASSIGNED' THEN 1
+           WHEN 'IN_PROGRESS' THEN 2
+           WHEN 'COMPLETED' THEN 3
+           WHEN 'CANCELLED' THEN 3
+           ELSE 0
+       END) < @statusRank;";
+        command.Parameters.AddWithValue("@jobId", jobId);
+        command.Parameters.AddWithValue("@jobStatus", jobStatus);
+        command.Parameters.AddWithValue("@statusRank", statusRank);
+        return await command.ExecuteNonQueryAsync(cancellationToken) > 0;
     }
 
     public async Task MarkJobAssignedPublishedAsync(string eventId, DateTime publishedAt, CancellationToken cancellationToken = default)
@@ -192,7 +226,7 @@ FOR UPDATE;";
             string.Empty,
             Convert.ToString(reader.GetValue(2))!,
             reader.GetString(3),
-            reader.GetDateTime(4));
+            DbDateTime.ReadUtc(reader, 4));
     }
 
     private static async Task<IReadOnlyList<AssignmentCandidate>> GetCandidatesAsync(MySqlConnection connection, MySqlTransaction transaction, string eventId, string jobId, CancellationToken cancellationToken)
@@ -219,7 +253,7 @@ GROUP BY t.id, t.technician_reference;";
         {
             candidates.Add(new(
                 Convert.ToString(reader.GetValue(0))!, reader.GetString(1), Convert.ToInt32(reader.GetValue(2)),
-                reader.IsDBNull(3) ? null : reader.GetDateTime(3)));
+                reader.IsDBNull(3) ? null : DbDateTime.ReadUtc(reader, 3)));
         }
         return candidates;
     }

@@ -12,12 +12,12 @@ public class FakeKafkaConsumer : IConsumer<string, string>
     public Action? OnMessagesExhausted { get; set; }
     public Message<string, string>? LastConsumedMessage { get; private set; }
 
-    public ConsumeResult<string, string> Enqueue(string value)
+    public ConsumeResult<string, string> Enqueue(string value, string key = "test-job")
     {
         var result = new ConsumeResult<string, string>
         {
             Topic = "job-created", Partition = new Partition(0), Offset = new Offset(_messages.Count),
-            Message = new Message<string, string> { Key = "test-job", Value = value },
+            Message = new Message<string, string> { Key = key, Value = value },
         };
         _messages.Enqueue(result);
         return result;
