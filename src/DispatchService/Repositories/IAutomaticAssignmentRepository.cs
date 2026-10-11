@@ -14,6 +14,13 @@ public interface IAutomaticAssignmentRepository
     /// <summary>Returns live (non-released, non-terminal) assignments for a technician.</summary>
     Task<IReadOnlyList<AssignmentRecord>> GetByTechnicianIdAsync(string technicianId, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Moves the job's assignment forward to <paramref name="jobStatus"/>. Returns
+    /// false when the job has no assignment or the assignment is already at or
+    /// past <paramref name="statusRank"/>.
+    /// </summary>
+    Task<bool> UpdateJobStatusAsync(string jobId, string jobStatus, int statusRank, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<PendingJobAssignedEvent>> GetPendingJobAssignedEventsAsync(
         int limit, CancellationToken cancellationToken = default);
     Task MarkJobAssignedPublishedAsync(string eventId, DateTime publishedAt, CancellationToken cancellationToken = default);

@@ -83,7 +83,8 @@ public class JobCreatedConsumer : BackgroundService
                     var result = await service.EvaluateAsync(
                         envelope.EventId, envelope.EventType, envelope.EventVersion, envelope.Producer,
                         envelope.Payload.JobId, envelope.Payload.JobReference, envelope.Payload.ServiceCategory,
-                        envelope.Payload.Region, envelope.OccurredAt);
+                        envelope.Payload.Region, envelope.Payload.Priority, envelope.Payload.ProblemDescription,
+                        envelope.OccurredAt);
 
                     if (result.Error != CandidateEvaluationError.None)
                     {

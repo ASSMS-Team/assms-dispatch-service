@@ -11,7 +11,7 @@ public class FakeCandidateEvaluationService : ICandidateEvaluationService
 
     public Task<CandidateEvaluationResult> EvaluateAsync(
         string eventId, string eventType, int eventVersion, string producer, string jobId, string jobReference,
-        string serviceCategory, string region, DateTime occurredAt)
+        string serviceCategory, string region, string? priority, string? problemDescription, DateTime occurredAt)
     {
         CallCount++;
         OnCall?.Invoke();

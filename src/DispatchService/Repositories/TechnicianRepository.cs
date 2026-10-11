@@ -102,8 +102,8 @@ ORDER BY ts.skill;";
                 Status = reader.GetString(statusOrdinal),
                 Phone = reader.IsDBNull(phoneOrdinal) ? null : reader.GetString(phoneOrdinal),
                 Email = reader.IsDBNull(emailOrdinal) ? null : reader.GetString(emailOrdinal),
-                CreatedAt = reader.GetDateTime(createdAtOrdinal),
-                UpdatedAt = reader.GetDateTime(updatedAtOrdinal),
+                CreatedAt = DbDateTime.ReadUtc(reader, createdAtOrdinal),
+                UpdatedAt = DbDateTime.ReadUtc(reader, updatedAtOrdinal),
             };
             if (!reader.IsDBNull(skillOrdinal)) skills.Add(reader.GetString(skillOrdinal));
         }
@@ -265,8 +265,8 @@ ORDER BY t.full_name, t.technician_reference, ts.skill;";
                     Status = reader.GetString(statusOrdinal),
                     Phone = reader.IsDBNull(phoneOrdinal) ? null : reader.GetString(phoneOrdinal),
                     Email = reader.IsDBNull(emailOrdinal) ? null : reader.GetString(emailOrdinal),
-                    CreatedAt = reader.GetDateTime(createdAtOrdinal),
-                    UpdatedAt = reader.GetDateTime(updatedAtOrdinal),
+                    CreatedAt = DbDateTime.ReadUtc(reader, createdAtOrdinal),
+                    UpdatedAt = DbDateTime.ReadUtc(reader, updatedAtOrdinal),
                 };
                 technicians.Add(id, technician);
             }
@@ -315,8 +315,8 @@ ORDER BY ts.skill;";
                 Status = reader.GetString(statusOrdinal),
                 Phone = reader.IsDBNull(phoneOrdinal) ? null : reader.GetString(phoneOrdinal),
                 Email = reader.IsDBNull(emailOrdinal) ? null : reader.GetString(emailOrdinal),
-                CreatedAt = reader.GetDateTime(createdAtOrdinal),
-                UpdatedAt = reader.GetDateTime(updatedAtOrdinal),
+                CreatedAt = DbDateTime.ReadUtc(reader, createdAtOrdinal),
+                UpdatedAt = DbDateTime.ReadUtc(reader, updatedAtOrdinal),
             };
             if (!reader.IsDBNull(skillOrdinal)) skills.Add(reader.GetString(skillOrdinal));
         }

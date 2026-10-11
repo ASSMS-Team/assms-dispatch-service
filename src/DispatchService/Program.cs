@@ -68,6 +68,7 @@ builder.Services.AddScoped<ICandidateEvaluationService, CandidateEvaluationServi
 builder.Services.AddScoped<IAutomaticAssignmentRepository, AutomaticAssignmentRepository>();
 builder.Services.AddScoped<IAutomaticAssignmentService, AutomaticAssignmentService>();
 builder.Services.AddScoped<MyAssignmentsService>();
+builder.Services.AddScoped<IAssignmentStatusService, AssignmentStatusService>();
 builder.Services.AddOptions<CandidateMatchingOptions>()
     .Bind(builder.Configuration.GetSection(CandidateMatchingOptions.SectionName));
 builder.Services.AddSingleton<RequiredSkillResolver>();
@@ -82,6 +83,10 @@ if (!string.IsNullOrWhiteSpace(kafkaBootstrapServers))
         kafkaBootstrapServers,
         serviceProvider.GetRequiredService<IServiceScopeFactory>(),
         serviceProvider.GetRequiredService<ILogger<JobCreatedConsumer>>()));
+    builder.Services.AddHostedService(serviceProvider => new JobStatusChangedConsumer(
+        kafkaBootstrapServers,
+        serviceProvider.GetRequiredService<IServiceScopeFactory>(),
+        serviceProvider.GetRequiredService<ILogger<JobStatusChangedConsumer>>()));
     builder.Services.AddSingleton<IJobAssignedPublisher>(_ => new KafkaJobAssignedPublisher(kafkaBootstrapServers));
     builder.Services.AddHostedService<JobAssignedOutboxPublisher>();
 }

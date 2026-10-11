@@ -7,7 +7,18 @@ public record AssignmentRecord(
     string JobReference,
     string TechnicianId,
     string TechnicianReference,
-    DateTime AssignedAt);
+    DateTime AssignedAt)
+{
+    // Job summary from the JobCreated evaluation, filled only when reading a
+    // Technician's assignment list. Null for evaluations recorded before V05.
+    public string? ServiceCategory { get; init; }
+    public string? Priority { get; init; }
+    public string? Region { get; init; }
+    public string? ProblemDescription { get; init; }
+
+    // Kept current from JobStatusChanged; a new assignment starts as ASSIGNED.
+    public string JobStatus { get; init; } = "ASSIGNED";
+}
 
 public enum AutomaticAssignmentOutcome
 {
